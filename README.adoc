@@ -193,7 +193,7 @@ Now, your style sheets will typically be compiled by the time you switched from 
 
 The `lessExecutable` is only required when _lessc_ is not on your path. In windows you should include the _.bat_ or _.cmd_ extension.
 
-You can read http://[here] how to install the node.js _lessc_ compiler.
+You can read http://lesscss.org/#using-less-installation[here] how to install the node.js _lessc_ compiler.
 
 TIP: Use the fast node.js compiler in the _lesscDaemon_ task to save time when developing the style sheets. Keep the default
 (java rhino based) compiler in the _lessc_ task to avoid installing node.js on your CI server and to have deterministic

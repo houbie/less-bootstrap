@@ -17,7 +17,7 @@ with automatic compilation.
 
 1. If you already have gradle:
 +
-There's only one file to download: https://github.com/houbie/less-bootstrap[build.gradle] :) +
+There's only one file to download: https://raw.githubusercontent.com/houbie/less-bootstrap/master/build.gradle[build.gradle] :) +
 Save it in the directory _less-bootstrap_ and then:
 +
 [source,bash]
@@ -30,7 +30,7 @@ gradle lesscDaemon --info
 2. You don't have Gradle yet:
 +
 Clone the github project with `git clone https://github.com/houbie/less-bootstrap`
-or download and unpack the https://github.com/houbie/less-bootstrap[zip distribution TODO]
+or download and unpack the https://github.com/houbie/less-bootstrap/archive/master.zip[zip distribution]
 and use the included gradle wrapper:
 +
 [source,bash]
@@ -203,7 +203,7 @@ builds that always use the same compiler version.
 
 [horizontal]
 Twitter Bootstrap:: http://getbootstrap.com/
-LESS:: http://less.org
+LESS:: http://lesscss.org
 Lesscss::  https://github.com/houbie/lesscss
 Lesscss gradle plugin::  https://github.com/houbie/lesscss-gradle-plugin
 Gradle:: http://gradle.org

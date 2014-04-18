@@ -1,0 +1,283 @@
+import com.github.houbie.lesscss.builder.CompilationUnit
+
+// Tell gradle which plugins we use and where to find them
+///////////////////////////////////////////////////////////
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url 'http://repo.springsource.org/plugins-release' }
+    }
+
+    dependencies {
+        classpath 'com.github.houbie:lesscss-gradle-plugin:0.9.1-less-1.7.0'
+        classpath 'com.eriwen:gradle-js-plugin:1.8.0'
+        classpath 'org.asciidoctor:asciidoctor-gradle-plugin:0.7.0'
+    }
+}
+
+apply plugin: 'lesscss'
+apply plugin: 'js'
+apply plugin: 'asciidoctor'
+
+// The dependencies we use (a grails plugin that packages the bootstrap source) and where to find them
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+repositories {
+    mavenCentral()
+    maven { url 'http://repo.grails.org/grails/plugins-releases-local' }
+}
+
+configurations {
+    bootstrap
+}
+
+dependencies {
+    bootstrap 'org.grails.plugins:twitter-bootstrap:3.1.1@zip'
+}
+
+//property definitions
+///////////////////////
+ext.webDir = 'web' //location of css, js, etc.
+ext.isDevBuild = true //variable for later use (in real project probably based on project version)
+
+//less compiler configuration
+//////////////////////////////
+lessc {
+    destinationDir = "$webDir/css"
+    sourceDir "$webDir/less", "$buildDir/bootstrap/web-app/less"
+    include 'bootstrap.less', 'theme.less'
+
+    //generate source maps so that Google Chrome shows the less source in the inspector i.s.o. the raw css
+    options.sourceMap = true
+
+    //the generated css file contains a reference to the source map, this reference will be relative to
+    //the sourceMapBasepath in this case it will be in the same directory as the css itself
+    //(default location of source maps)
+    options.sourceMapBasepath = file("$webDir/css").absolutePath
+
+    //we could try to specify the sourceMapxxx options so that the browser can load the less sources
+    //directly, but this is not trivial since our sources reside in different locations
+    //therefore we just copy all the less source code into the source map file
+    options.sourceMapLessInline = true
+
+    //we can define/override less variables with globalVars/modifyVars resp.
+    //modifyVars will always take precedence, no matter what you put in the less source
+    //this can be useful if f.e. you want to use a different coloring scheme for development builds versus release builds
+    if (isDevBuild) {
+        options.modifyVars = ['brand-primary': 'purple']
+    }
+
+    //the preCompile closure gives us the opportunity to change the options and destination files on a per-css-basis
+    preCompile { FileTreeElement src, CompilationUnit unit ->
+        if (src.name == 'theme.less') {
+            //the bootstrap examples expect 'bootstrap-theme.css' i.s.o. the default 'theme.css'
+            unit.destination = project.file("$webDir/css/bootstrap-theme.css")
+        }
+    }
+}
+
+//lessc compiler daemon for development use
+lesscDaemon {
+    interval = 200 //scan each 200 milliseconds for changes
+    engine = 'commandline'
+    //don't wait for compilations to finish by using the super fast node.js lessc compiler in dev mode
+// uncomment if lessc is not on the system path; don't forget the '.cmd' extension on windows
+//    lessExecutable = '/opt/local/bin/lessc'
+}
+
+// install the bootstrap sources so that they can easily be customized
+///////////////////////////////////////////////////////////////////////
+task init {
+    dependsOn 'copyBootstrapResources', 'minifyJs', 'createCustomizationFiles', 'createCustomLess', 'createSemanticHtml'
+}
+
+task explodeBootstrap(type: Copy) { task ->
+    //we declared a dependency on bootstrap just like on any other (java) library
+    //here we unzip that dependency
+    from(zipTree(configurations.bootstrap.fileCollection { dep -> dep.name == 'twitter-bootstrap' }.singleFile));
+    into "$buildDir/bootstrap"
+}
+
+task copyBootstrapResources(type: Copy, dependsOn: explodeBootstrap) {
+    from "$buildDir/bootstrap/web-app"
+    into "$webDir"
+    include 'js/**/*', 'fonts/**/*'
+}
+
+//normaly we should use the combineJs task from the js plugin, but that one does not preserve order
+task combineJsFiles(dependsOn: 'explodeBootstrap') << {
+    def srcDir = file("$project.webDir/js")
+    def includes = ["bootstrap-transition.js",
+                    "bootstrap-alert.js",
+                    "bootstrap-button.js",
+                    "bootstrap-carousel.js",
+                    "bootstrap-collapse.js",
+                    "bootstrap-dropdown.js",
+                    "bootstrap-modal.js",
+                    "bootstrap-tooltip.js",
+                    "bootstrap-popover.js",
+                    "bootstrap-scrollspy.js",
+                    "bootstrap-tab.js",
+                    "bootstrap-affix.js"]
+    def output = file("$project.webDir/js/bootstrap.js")
+    output.createNewFile()
+    includes.each {
+        output << file("$project.webDir/js/$it").text
+    }
+}
+
+
+combineJs {
+    source = "$project.webDir/js"
+    include "bootstrap-transition.js",
+                        "bootstrap-alert.js",
+                        "bootstrap-button.js",
+                        "bootstrap-carousel.js",
+                        "bootstrap-collapse.js",
+                        "bootstrap-dropdown.js",
+                        "bootstrap-modal.js",
+                        "bootstrap-tooltip.js",
+                        "bootstrap-popover.js",
+                        "bootstrap-scrollspy.js",
+                        "bootstrap-tab.js",
+                        "bootstrap-affix.js"
+    dest = file("$project.webDir/js/bootstrap.js")
+}
+
+
+//from js plugin
+minifyJs {
+    source = file "$webDir/js/bootstrap.js"
+    dest = file("$webDir/js/bootstrap.min.js")
+    closure {
+        warningLevel = 'QUIET'
+    }
+}
+minifyJs.dependsOn combineJsFiles
+
+task createCustomizationFiles(dependsOn: explodeBootstrap) << {
+    def lessDir = file("$webDir/less")
+    lessDir.mkdirs()
+    //create a file in which we can override the standard bootstrap variables (colors etc.)
+    new File(lessDir, "custom-variables.less").createNewFile()
+    //create a file in which we can define custom styles according to our application semantics
+    //these styles will combine/reuse bootstrap styles, but have meaningfull names based on our application's abstractions
+    new File(lessDir, "application.less").createNewFile()
+
+    //have our custom less files imported into bootstrap.less and theme.less
+    file("$buildDir/bootstrap/web-app/less/bootstrap.less").text += '''
+@import "custom-variables.less";
+@import "application.less";'''
+
+    file("$buildDir/bootstrap/web-app/less/theme.less").text += '@import "custom-variables.less";'
+}
+
+// create example material
+// this part will not be present in a real project
+///////////////////////////////////////////////////
+task createCustomLess(dependsOn: createCustomizationFiles) << {
+    //override a variable
+    file("$webDir/less/custom-variables.less").text = '@brand-info: blue;'
+
+    //create some example styles with semantic meaning
+    file("$webDir/less/application.less").text = '''
+/* define your own semantics */
+.article {
+  .make-row();        // Mixin provided by Bootstrap
+  h3 {
+    color: @brand-info
+  }
+  .main-section {
+    .make-lg-column(5); // Mixin provided by Bootstrap
+  }
+  .aside {
+    .make-md-column(2); // Mixin provided by Bootstrap
+  }
+}
+
+
+/* or even better with (custom) HTML5 tags */
+article {
+  .make-row();
+  h3 {
+    color: @brand-info
+  }
+  section.main {
+    .make-lg-column(5);
+  }
+  aside {
+    .make-md-column(2);
+  }
+}'''
+}
+
+//download the bootstrap distribution for the examples
+task downloadBootstrap {
+    def zipFile = file("$buildDir/bootstrap.zip")
+    outputs.file zipFile
+    doLast {
+        mkdir zipFile.parentFile
+        ant.get(src: 'https://github.com/twbs/bootstrap/archive/v3.1.1.zip', dest: zipFile)
+    }
+}
+
+task copyBootstrapExamples(type: Copy, dependsOn: downloadBootstrap) {
+    from zipTree(downloadBootstrap.outputs.files.singleFile)
+    into "$webDir/bootstrap-examples"
+    include 'bootstrap-3.1.1/docs/examples/**/*'
+    include 'bootstrap-3.1.1/docs/assets/**/*'
+    eachFile { details ->
+        //shorten the paths
+        details.path = (details.path - 'bootstrap-3.1.1/docs/examples') - 'bootstrap-3.1.1/docs'
+    }
+    filter { line ->
+        //adjust the relative paths to css and javascript
+        line.replace('../../dist/', '../../')
+                .replace('bootstrap.min.css', 'bootstrap.css')
+                .replace('theme.min.css', 'theme.css')
+                .replace('../../assets', '../assets')
+    }
+}
+
+//clean up empty dirs generated by copyBootstrapExamples
+task cleanBootstrapExamples(type: Delete, dependsOn: copyBootstrapExamples) {
+    delete "$webDir/bootstrap-examples/bootstrap-3.1.1"
+}
+
+task createSemanticHtml(type: Copy, dependsOn: cleanBootstrapExamples) {
+    //copy the starter template example and add some html to it
+    from "$webDir/bootstrap-examples/starter-template/index.html"
+    into "$webDir/bootstrap-examples/starter-template/"
+    eachFile { details ->
+        details.name = 'semantics.html'
+    }
+    filter { line ->
+        line.replace '</div><!-- /.container -->', '''
+<div class="article">
+    <div class="main-section">
+        <h3>Main section with our own, semanticized, HTML</h3>
+
+        <p>Lorem ipsum dolor sit amet, magna maiorum corpora ea ius, quas tation oporteat ei eam, fastidii mandamus
+            efficiantur vim ne. Ius no amet luptatum democritum, ex eam alia feugiat dolorum. Ei veri graece eos, no
+            sit movet nominati suavitate. Zril partiendo ocurreret his an.</p>
+    </div>
+    <div class="aside">Read the <a href="http://ruby.bvision.com/blog/please-stop-embedding-bootstrap-classes-in-your-html">original blog</a></div>
+</div>
+
+<article>
+    <section class="main">
+        <h3>Main section with our own, even better semanticized, HTML5</h3>
+
+        <p>Lorem ipsum dolor sit amet, magna maiorum corpora ea ius, quas tation oporteat ei eam, fastidii mandamus
+            efficiantur vim ne. Ius no amet luptatum democritum, ex eam alia feugiat dolorum. Ei veri graece eos, no
+            sit movet nominati suavitate. Zril partiendo ocurreret his an.</p>
+    </section>
+    <aside>This time with HTML5 tags!</aside>
+</article>
+</div><!-- /.container -->
+'''
+    }
+}
+
+asciidoctor {
+	sourceDir = file('.')
+}

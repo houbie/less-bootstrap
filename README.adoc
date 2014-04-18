@@ -1,0 +1,209 @@
+= Customizing Twitter Bootstrap with the Lesscss Gradle plugin
+:source-highlighter: coderay
+:imagesdir: images
+
+[abstract]
+== Abstract
+
+In this article I will show you how to customize the http://getbootstrap.com/[Twitter Bootstrap style sheets] and compile
+them with the https://github.com/houbie/lesscss-gradle-plugin[Lesscss Gradle plugin].
+
+You won't have to change the original sources. You won't even have to download them manually.
+
+I'll also show how you can inspect the LESS sources in your browser (in stead of the generated CSS) and how to get productive
+with automatic compilation.
+
+== Quick start
+
+1. If you already have gradle:
++
+There's only one file to download: https://github.com/houbie/less-bootstrap[build.gradle] :) +
+Save it in the directory _less-bootstrap_ and then:
++
+[source,bash]
+----
+cd less-bootstrap
+gradle init
+gradle lesscDaemon --info
+----
+
+2. You don't have Gradle yet:
++
+Clone the github project with `git clone https://github.com/houbie/less-bootstrap`
+or download and unpack the https://github.com/houbie/less-bootstrap[zip distribution TODO]
+and use the included gradle wrapper:
++
+[source,bash]
+----
+cd less-bootstrap
+gradlew init
+gradlew lesscDaemon --info
+----
+
+Now you can:
+
+. open _less-bootstrap/web/bootstrap-examples/theme/index.html_ (or an other example)
+. change _less-bootstrap/web/less/custom-variables.less_
+. reload the page to see the changes
+
+TIP: Before reloading the page in your browser, you'll have to wait a few seconds until the style sheets are compiled.
+If you don't like waiting (who does?), see <<_speeding_up_compilation>>
+
+== Exploring the examples
+
+The examples are located in _less-bootstrap/web/bootstrap-examples_. When you open f.e. _less-bootstrap/web/bootstrap-examples/theme/index.html_
+and inspect the _Learn more_ button in Google Chrome, you will see something like this:
+
+.Inspecting an element in Chrome
+image::inspect.png[Inspecting an element in Chrome]
+
+The inspector shows the LESS sources because the the _lessc_ task is configured to generate source maps:
+
+.Enabling source maps in `build.gradle`
+[source,java]
+----
+include::build.gradle[lines=49..60]
+----
+
+NOTE: At the moment of writing, Chrome is the only browser that supports source maps for CSS files.
+http://robdodson.me/blog/2012/12/28/debug-less-with-chrome-developer-tools/[This blog] shows how to enable CSS source maps
+if they are not enabled by default.
+
+== Customizing the style sheet
+
+=== Where is the code?
+
+We would like to change the background color of the _Learn more_ button, but how do we locate its definition?
+
+Again, by inspecting the element in Chrome, we see that the background color is defined in _buttons.less_.
+
+.The button's background colour
+image::background-color.png[The button's background colour]
+
+When we double-click _buttons.less_, the source is opened in the inspector:
+
+.Buttons.less
+image::buttons-less.png[Buttons.less]
+
+We see that the variable that we need to change is `btn-primary-bg`. Unfortunately, we cannot navigate further anymore
+in the inspector, so we have to search manually.
+
+The bootstrap source files can be found in _less-bootstrap/build/bootstrap/web-app/less_. A text search leads us to _mixins.less_
+for the `button-variant` definition and to _variables.less_ for the background color variable:
+
+[source,less]
+----
+@btn-primary-bg: @brand-primary;
+----
+
+Albeit not perfect, it is a lot easier to find the code in this way than if we would only see the raw CSS in the inspector.
+
+At this point we have to decide whether we want to change only the color of the primary buttons, or if we want to change
+the primary brand color.
+
+=== Modifying styles
+
+There are 3 ways to modify the style sheets:
+
+1. Overwrite variables in _build.gradle_
+2. Modify a copy of the original source
+3. Create our own customization LESS file
+
+==== Overwriting variables in _build.gradle_
+
+The lesscss compiler allows us to declare new or overwrite existing variables via the commandline or in _build.gradle_:
+
+[source,java]
+----
+lessc {
+    ...
+    options.modifyVars = ['brand-primary': 'purple']
+}
+----
+
+Overwriting variables this way can be useful if you want f.e. to use a different color scheme for development builds than for release builds, but
+it is not suitable for more involved customizations.
+
+==== Modify a copy of the original source
+
+The _lessc_ task is configured to lookup LESS files first in _less-bootstrap/web/less_:
+
+[source,java]
+----
+lessc {
+    ...
+    sourceDir "$webDir/less", "$buildDir/bootstrap/web-app/less"
+}
+----
+
+This means that if we would copy _variables.less_ to _less-bootstrap/web/less_ and modify it, it will take precedence over
+the original file.
+
+However, when we would like to upgrade to a newer bootstrap version, we would need to apply all our changes again in the
+new file, which is far from ideal.
+
+NOTE: Changing `brand-primary` in our copy of _variables.less_ won't have any effect, it will always be overridden by
+the value in _build.gradle_!
+
+==== Create our own customization LESS file
+
+The main LESS file, _bootstrap.less_, consists of only import statements. If we would append a few import statements to
+include our own customization files, we wouldn't have to change the original LESS code. This is exactly what the _init_
+task does when it unpacks the bootstrap sources:
+
+[source,java]
+----
+//have our custom less files imported into bootstrap.less and theme.less
+file("$buildDir/bootstrap/web-app/less/bootstrap.less").text += '''
+@import "custom-variables.less";
+@import "application.less";'''
+
+file("$buildDir/bootstrap/web-app/less/theme.less").text += '@import "custom-variables.less";'
+----
+
+Now you only have to keep the customizations in your project's source repository. Furthermore, switching to another version of
+bootstrap becomes trivial.
+
+== Define your own semantics
+
+As ?? pointed out in his http://[blog], you should use html elements and/or CSS classes that outline the structure of
+your documents.
+
+_/less-bootstrap/web/less/application.less_ defines a sample article structure that is used in
+_less-bootstrap/web/bootstrap-examples/starter-template/semantics.html_.
+
+Again, we are extending bootstrap without changing the original sources.
+
+== Speeding up compilation
+
+Although the https://github.com/houbie/lesscss[lesscss compiler] is the fastest Java LESS compiler, it is still very slow
+compared with the original node.js compiler.
+
+Fortunately, you can use the node.js _lessc_ compiler in combination with the Lesscss Gradle Plugin:
+
+[source,java]
+----
+lesscDaemon {
+    engine = 'commandline'
+    lessExecutable = '/opt/local/bin/lessc'
+}
+----
+
+Now, your style sheets will typically be compiled by the time you switched from the source editor to the browser.
+
+The `lessExecutable` is only required when _lessc_ is not on your path. In windows you should include the _.bat_ or _.cmd_ extension.
+
+You can read http://[here] how to install the node.js _lessc_ compiler.
+
+TIP: Use the fast node.js compiler in the _lesscDaemon_ task to save time when developing the style sheets. Keep the default
+(java rhino based) compiler in the _lessc_ task to avoid installing node.js on your CI server and to have deterministic
+builds that always use the same compiler version.
+
+== Resources
+
+[horizontal]
+Twitter Bootstrap:: http://getbootstrap.com/
+LESS:: http://less.org
+Lesscss::  https://github.com/houbie/lesscss
+Lesscss gradle plugin::  https://github.com/houbie/lesscss-gradle-plugin
+Gradle:: http://gradle.org

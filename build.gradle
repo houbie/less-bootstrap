@@ -129,20 +129,19 @@ task combineJsFiles(dependsOn: 'explodeBootstrap') << {
 combineJs {
     source = "$project.webDir/js"
     include "bootstrap-transition.js",
-                        "bootstrap-alert.js",
-                        "bootstrap-button.js",
-                        "bootstrap-carousel.js",
-                        "bootstrap-collapse.js",
-                        "bootstrap-dropdown.js",
-                        "bootstrap-modal.js",
-                        "bootstrap-tooltip.js",
-                        "bootstrap-popover.js",
-                        "bootstrap-scrollspy.js",
-                        "bootstrap-tab.js",
-                        "bootstrap-affix.js"
+            "bootstrap-alert.js",
+            "bootstrap-button.js",
+            "bootstrap-carousel.js",
+            "bootstrap-collapse.js",
+            "bootstrap-dropdown.js",
+            "bootstrap-modal.js",
+            "bootstrap-tooltip.js",
+            "bootstrap-popover.js",
+            "bootstrap-scrollspy.js",
+            "bootstrap-tab.js",
+            "bootstrap-affix.js"
     dest = file("$project.webDir/js/bootstrap.js")
 }
-
 
 //from js plugin
 minifyJs {
@@ -279,5 +278,10 @@ task createSemanticHtml(type: Copy, dependsOn: cleanBootstrapExamples) {
 }
 
 asciidoctor {
-	sourceDir = file('.')
+    sourceDir = file('.')
+}
+
+task prepareBlog() << {
+    def blog = file "$buildDir/blog.html"
+    blog.text = file("$buildDir/asciidoc/README.html").text.replaceAll('(?s)<div id="header">.+?</div>', '')
 }

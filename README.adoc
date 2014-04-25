@@ -1,6 +1,7 @@
 = Customizing Twitter Bootstrap with the Lesscss Gradle plugin
 :source-highlighter: coderay
 :imagesdir: images
+:data-uri:
 
 [abstract]
 == Abstract

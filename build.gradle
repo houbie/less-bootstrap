@@ -78,10 +78,11 @@ lessc {
 //lessc compiler daemon for development use
 lesscDaemon {
     interval = 200 //scan each 200 milliseconds for changes
-    engine = 'commandline'
-    //don't wait for compilations to finish by using the super fast node.js lessc compiler in dev mode
-// uncomment if lessc is not on the system path; don't forget the '.cmd' extension on windows
-//    lessExecutable = '/opt/local/bin/lessc'
+    //uncomment if you don't want to wait for compilations to finish by using
+    //the super fast node.js lessc compiler in dev mode
+    //engine = 'commandline'
+    //uncomment if lessc is not on the system path; don't forget the '.cmd' extension on windows
+    //lesscExecutable = '/opt/local/bin/lessc'
 }
 
 // install the bootstrap sources so that they can easily be customized

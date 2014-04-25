@@ -5,19 +5,16 @@ import com.github.houbie.lesscss.builder.CompilationUnit
 buildscript {
     repositories {
         mavenCentral()
-        maven { url 'http://repo.springsource.org/plugins-release' }
     }
 
     dependencies {
         classpath 'com.github.houbie:lesscss-gradle-plugin:1.0.0-less-1.7.0'
         classpath 'com.eriwen:gradle-js-plugin:1.8.0'
-        classpath 'org.asciidoctor:asciidoctor-gradle-plugin:0.7.0'
     }
 }
 
 apply plugin: 'lesscss'
 apply plugin: 'js'
-apply plugin: 'asciidoctor'
 
 // The dependencies we use (a grails plugin that packages the bootstrap source) and where to find them
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,6 +29,7 @@ configurations {
 
 dependencies {
     bootstrap 'org.grails.plugins:twitter-bootstrap:3.1.1@zip'
+    compile 'com.google.gdata:core:1.47.1'
 }
 
 //property definitions
@@ -46,7 +44,7 @@ lessc {
     sourceDir "$webDir/less", "$buildDir/bootstrap/web-app/less"
     include 'bootstrap.less', 'theme.less'
 
-    //generate source maps so that Google Chrome shows the less source in the inspector i.s.o. the raw css
+    //generate source maps so that Google Chrome shows the less source in the inspector i.s.o. the raw CSS
     options.sourceMap = true
 
     //the generated css file contains a reference to the source map, this reference will be relative to
@@ -54,7 +52,7 @@ lessc {
     //(default location of source maps)
     options.sourceMapBasepath = file("$webDir/css").absolutePath
 
-    //we could try to specify the sourceMapxxx options so that the browser can load the less sources
+    //we could try to specify the sourceMapxxx options so that the browser can load the LESS sources
     //directly, but this is not trivial since our sources reside in different locations
     //therefore we just copy all the less source code into the source map file
     options.sourceMapLessInline = true
@@ -276,13 +274,4 @@ task createSemanticHtml(type: Copy, dependsOn: cleanBootstrapExamples) {
 </div><!-- /.container -->
 '''
     }
-}
-
-asciidoctor {
-    sourceDir = file('.')
-}
-
-task prepareBlog() << {
-    def blog = file "$buildDir/blog.html"
-    blog.text = file("$buildDir/asciidoc/README.html").text.replaceAll('(?s)<div id="header">.+?</div>', '')
 }

@@ -1,7 +1,6 @@
 = Customizing Twitter Bootstrap with the Lesscss Gradle plugin
 :source-highlighter: coderay
 :imagesdir: images
-:data-uri:
 
 [abstract]
 == Abstract
@@ -63,7 +62,23 @@ The inspector shows the LESS sources because the the _lessc_ task is configured 
 .Enabling source maps in `build.gradle`
 [source,java]
 ----
-include::build.gradle[lines=49..60]
+lessc {
+    ...
+
+    //generate source maps so that Google Chrome shows the less source in the inspector i.s.o. the raw CSS
+    options.sourceMap = true
+
+    //the generated css file contains a reference to the source map, this reference will be relative to
+    //the sourceMapBasepath in this case it will be in the same directory as the css itself
+    //(default location of source maps)
+    options.sourceMapBasepath = file("$webDir/css").absolutePath
+
+    //we could try to specify the sourceMapxxx options so that the browser can load the LESS sources
+    //directly, but this is not trivial since our sources reside in different locations
+    //therefore we just copy all the less source code into the source map file
+    options.sourceMapLessInline = true
+
+}
 ----
 
 NOTE: At the moment of writing, Chrome is the only browser that supports source maps for CSS files.
